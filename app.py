@@ -1,6 +1,8 @@
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template_string, send_file
 from openai import AzureOpenAI
+from docx import Document
 import os
+import io
 
 app = Flask(__name__)
 
@@ -91,13 +93,16 @@ HTML_TEMPLATE = """
         <div class="d-grid mb-3">
             <button type="submit" class="btn btn-primary">Generate Policy</button>
         </div>
+        <div class="d-grid mb-4">
+            <button type="button" id="downloadDocx" class="btn btn-success">📄 Download DOCX</button>
+        </div>
     </form>
-
     <h5>Generated Output:</h5>
     <pre id="output" class="bg-light p-3 rounded">Waiting for input...</pre>
 </div>
-
 <script>
+let latestPolicy = null;
+
 document.getElementById("templateSelect").addEventListener("change", function() {
     const template = this.value;
     if (template) document.getElementById("prompt").value = template;
@@ -132,7 +137,40 @@ document.getElementById("policyForm").addEventListener("submit", async function(
     });
 
     const result = await response.json();
-    output.textContent = result.result || JSON.stringify(result);
+
+    try {
+        latestPolicy = JSON.parse(result.result);
+        output.textContent = JSON.stringify(latestPolicy, null, 2);
+    } catch {
+        latestPolicy = null;
+        output.textContent = result.result || JSON.stringify(result);
+    }
+});
+
+document.getElementById("downloadDocx").addEventListener("click", async function () {
+    if (!latestPolicy) {
+        alert("Generate a policy before downloading.");
+        return;
+    }
+
+    const response = await fetch("/export-doc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ policy: latestPolicy })
+    });
+
+    if (!response.ok) {
+        alert("Error exporting DOCX.");
+        return;
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "filled_firewall_request.docx";
+    a.click();
+    window.URL.revokeObjectURL(url);
 });
 </script>
 </body>
@@ -197,6 +235,50 @@ def generate_policy():
     except Exception as e:
         print(f"❌ Error: {e}")
         return jsonify({ "error": str(e) }), 500
+
+@app.route("/export-doc", methods=["POST"])
+def export_to_doc():
+    try:
+        data = request.get_json()
+        policy = data.get("policy", {})
+
+        doc = Document("test my app.docx")
+
+        source_ip = ", ".join(policy.get("source_ip", [""]))
+        destination_ip = ", ".join(policy.get("destination_ip", [""]))
+        protocol = policy.get("protocol", "TCP")
+        port = policy.get("port", "443")
+        action = policy.get("action", "PERMIT").upper()
+        rule = "NEW"
+        description = policy.get("description", policy.get("rule_name", ""))
+
+        for table in doc.tables:
+            for row_idx, row in enumerate(table.rows):
+                if "S.No" in row.cells[0].text:
+                    if len(table.rows) > row_idx + 1:
+                        cells = table.rows[row_idx + 1].cells
+                        cells[0].text = "1"
+                        cells[1].text = source_ip
+                        cells[2].text = destination_ip
+                        cells[3].text = f"{protocol}/{port}"
+                        cells[4].text = action
+                        cells[5].text = rule
+                        if len(cells) > 6:
+                            cells[6].text = description
+                        break
+            else:
+                continue
+            break
+
+        output = io.BytesIO()
+        doc.save(output)
+        output.seek(0)
+
+        return send_file(output, download_name="filled_firewall_request.docx", as_attachment=True)
+
+    except Exception as e:
+        print(f"❌ Error exporting DOCX: {e}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
