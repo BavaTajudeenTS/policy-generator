@@ -155,7 +155,7 @@ document.getElementById("downloadDocx").addEventListener("click", async function
     }
 
     const mappedPolicy = {
-    source_ip: latestPolicy.source_ip || (latestPolicy.source_address ? [latestPolicy.source_address] : []),
+    source_ip: latestPolicy.source_ip || latestPolicy.source_address || [],
     destination_ip: latestPolicy.destination_ip || latestPolicy.destination_address || [],
     protocol: latestPolicy.protocol || "TCP",
     port: latestPolicy.port || "443",
