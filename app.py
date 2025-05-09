@@ -11,50 +11,70 @@ client = AzureOpenAI(
     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
 )
 
-# Simple HTML UI template
+# Rich UI HTML Template using Bootstrap
 HTML_TEMPLATE = """
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Azure GPT Policy Generator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { font-family: Arial; margin: 40px; }
-        textarea { width: 100%; height: 80px; font-size: 16px; }
-        pre { background: #f4f4f4; padding: 15px; border-radius: 8px; }
-        button { padding: 10px 20px; font-size: 16px; margin-top: 10px; }
+        body { padding-top: 40px; }
+        pre { white-space: pre-wrap; word-wrap: break-word; }
     </style>
 </head>
 <body>
-    <h2>🔐 Azure GPT-Powered Policy Generator</h2>
-    <form id="policyForm">
-        <label for="prompt">Enter your policy prompt:</label><br>
-        <textarea id="prompt" name="prompt" placeholder="Allow inbound SSH from 10.0.0.0/24"></textarea><br>
-        <button type="submit">Generate Policy</button>
-    </form>
-    <h3>Generated Policy (JSON):</h3>
-    <pre id="output">Waiting for input...</pre>
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <h2 class="mb-4 text-center">🔐 Azure GPT-Powered Policy Generator</h2>
+            <form id="policyForm">
+                <div class="mb-3">
+                    <label for="prompt" class="form-label">Policy Prompt</label>
+                    <textarea class="form-control" id="prompt" rows="4" placeholder="e.g., Allow inbound SSH from 10.0.0.0/24"></textarea>
+                </div>
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary">Generate Policy</button>
+                </div>
+            </form>
+            <div class="mt-4">
+                <h5>Generated Policy (JSON):</h5>
+                <pre id="output" class="bg-light p-3 rounded">Waiting for input...</pre>
+            </div>
+        </div>
+    </div>
+</div>
 
-    <script>
-        document.getElementById("policyForm").addEventListener("submit", async function(event) {
-            event.preventDefault();
-            const prompt = document.getElementById("prompt").value;
-            const response = await fetch("/generate-policy", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ prompt })
-            });
+<script>
+document.getElementById("policyForm").addEventListener("submit", async function(event) {
+    event.preventDefault();
+    const output = document.getElementById("output");
+    output.textContent = "⏳ Generating policy...";
 
-            const result = await response.json();
-            try {
-                const jsonObj = JSON.parse(result.result);
-                document.getElementById("output").textContent = JSON.stringify(jsonObj, null, 2);
-            } catch {
-                document.getElementById("output").textContent = result.result || JSON.stringify(result);
-            }
+    const prompt = document.getElementById("prompt").value;
+    try {
+        const response = await fetch("/generate-policy", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ prompt })
         });
-    </script>
+
+        const result = await response.json();
+        const jsonStr = result.result || JSON.stringify(result);
+        try {
+            const jsonObj = JSON.parse(jsonStr);
+            output.textContent = JSON.stringify(jsonObj, null, 2);
+        } catch {
+            output.textContent = jsonStr;
+        }
+    } catch (err) {
+        output.textContent = "❌ Error: " + err.message;
+    }
+});
+</script>
 </body>
 </html>
 """
