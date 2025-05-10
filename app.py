@@ -144,7 +144,7 @@ document.getElementById("policyForm").addEventListener("submit", async function(
         output.textContent = JSON.stringify(latestPolicy, null, 2);
     } catch {
         latestPolicy = null;
-        output.textContent = result.result || JSON.stringify(result);
+        output.textContent = result.result ? result.result : JSON.stringify(result);
     }
 });
 
@@ -190,20 +190,6 @@ document.getElementById("downloadDocx").addEventListener("click", async function
     a.click();
     window.URL.revokeObjectURL(url);
 });
-
-    if (!response.ok) {
-        alert("Error exporting DOCX.");
-        return;
-    }
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "filled_firewall_request.docx";
-    a.click();
-    window.URL.revokeObjectURL(url);
-});
 </script>
 </body>
 </html>
@@ -218,6 +204,8 @@ def generate_policy():
     try:
         data = request.get_json()
         prompt = data.get("prompt", "")
+        print("📨 Sending prompt to OpenAI:", prompt)
+
         source_zone = data.get("source_zone", "trust")
         destination_zone = data.get("destination_zone", "trust")
         action = data.get("action", "allow")
@@ -287,7 +275,6 @@ def export_to_doc():
         for table in doc.tables:
             for row in table.rows:
                 if "S.No" in row.cells[0].text:
-                    # Insert into next row
                     target_idx = table.rows.index(row) + 1
                     if target_idx < len(table.rows):
                         cells = table.rows[target_idx].cells
