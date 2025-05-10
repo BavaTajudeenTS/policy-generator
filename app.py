@@ -189,20 +189,6 @@ document.getElementById("downloadDocx").addEventListener("click", async function
     a.click();
     window.URL.revokeObjectURL(url);
 });
-
-    if (!response.ok) {
-        alert("Error exporting DOCX.");
-        return;
-    }
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "filled_firewall_request.docx";
-    a.click();
-    window.URL.revokeObjectURL(url);
-});
 </script>
 </body>
 </html>
@@ -274,6 +260,13 @@ def export_to_doc():
     try:
         data = request.get_json()
         policy = data.get("policy", {})
+        print("📄 Mapped policy for DOCX export:", policy)
+
+        doc_path = os.path.join(os.path.dirname(__file__), "test my app.docx")
+        if not os.path.exists(doc_path):
+            return jsonify({"error": "❌ DOCX template not found on server!"}), 500
+
+        doc = Document(doc_path)
 
         doc = Document("test my app.docx")
 
